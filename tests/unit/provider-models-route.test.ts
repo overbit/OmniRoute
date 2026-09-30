@@ -13,6 +13,7 @@ const modelsDb = await import("../../src/lib/db/models.ts");
 const providerModelsRoute = await import("../../src/app/api/providers/[id]/models/route.ts");
 const antigravityVersion = await import("../../open-sse/services/antigravityVersion.ts");
 const providerRegistry = await import("../../open-sse/config/providerRegistry.ts");
+const modelService = await import("../../open-sse/services/model.ts");
 
 const originalFetch = globalThis.fetch;
 const originalAllowPrivateProviderUrls = process.env.OMNIROUTE_ALLOW_PRIVATE_PROVIDER_URLS;
@@ -59,6 +60,55 @@ test.after(async () => {
   globalThis.fetch = originalFetch;
   core.resetDbInstance();
   fs.rmSync(TEST_DATA_DIR, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+});
+
+test("OpenAI discovers live-only model IDs from its registry endpoint (#15214)", async () => {
+  const futureModel = "omni-openai-future-15214";
+  const connection = await seedConnection("openai", {
+    apiKey: "sk-openai",
+    providerSpecificData: { autoFetchModels: true },
+  });
+
+  const registryEntry = providerRegistry.getRegistryEntry("openai");
+  assert.equal(registryEntry?.modelsUrl, "https://api.openai.com/v1/models");
+
+  const beforeDiscovery = await modelService.getModelInfoCore(futureModel, {});
+  assert.equal(beforeDiscovery.provider, null);
+
+  const seenRequests = [];
+  globalThis.fetch = async (url, init) => {
+    const headers = new Headers(init?.headers);
+    seenRequests.push({
+      url: String(url),
+      authorization: headers.get("authorization"),
+    });
+    return Response.json({
+      data: [
+        { id: "gpt-5.6", object: "model", owned_by: "openai" },
+        { id: futureModel, object: "model", owned_by: "openai" },
+      ],
+    });
+  };
+
+  const response = await callRoute(connection.id, "?refresh=true");
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.source, "api");
+  assert.deepEqual(seenRequests, [
+    {
+      url: "https://api.openai.com/v1/models",
+      authorization: "Bearer sk-openai",
+    },
+  ]);
+  assert.ok(body.models.some((model) => model.id === futureModel));
+
+  const syncedModels = await modelsDb.getSyncedAvailableModels("openai");
+  assert.ok(syncedModels.some((model) => model.id === futureModel));
+
+  const afterDiscovery = await modelService.getModelInfoCore(futureModel, {});
+  assert.equal(afterDiscovery.provider, "openai");
+  assert.equal(afterDiscovery.model, futureModel);
 });
 
 test("provider models route returns a static local catalog for non-LLM search/agent providers (#5569/#5571/#5573/#5575)", async () => {

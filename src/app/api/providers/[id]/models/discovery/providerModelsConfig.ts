@@ -515,14 +515,6 @@ export const PROVIDER_MODELS_CONFIG: Record<string, ProviderModelsConfigEntry> =
     },
     parseResponse: (data: any) => (Array.isArray(data) ? data : data?.data || data?.models || []),
   },
-  openai: {
-    url: "https://api.openai.com/v1/models",
-    method: "GET",
-    headers: { "Content-Type": "application/json" },
-    authHeader: "Authorization",
-    authPrefix: "Bearer ",
-    parseResponse: (data) => data.data || [],
-  },
   "grok-cli": {
     url: GROK_BUILD_MODELS_URL,
     method: "GET",

@@ -7,6 +7,7 @@ export const openaiProvider: RegistryEntry = {
   format: "openai",
   executor: "default",
   baseUrl: "https://api.openai.com/v1/chat/completions",
+  modelsUrl: "https://api.openai.com/v1/models",
   reasoningTransport: "opaque",
   authType: "apikey",
   authHeader: "bearer",
