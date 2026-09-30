@@ -1,0 +1,1 @@
+- **feat(providers):** Discover first-party OpenAI model IDs from the live `/v1/models` catalog while retaining the registry as metadata and fallback ([#1](https://github.com/overbit/OmniRoute/pull/1)) — thanks @overbit
