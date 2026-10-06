@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 type MockAuditDb = {
   prepare: ReturnType<typeof vi.fn>;
@@ -34,9 +34,13 @@ it("uses the bundle-safe runtime loader for better-sqlite3", () => {
 describe("MCP audit shutdown", () => {
   let dataDir: string;
   let dbFile: string;
+  let audit: typeof import("../audit.ts");
+
+  beforeAll(async () => {
+    audit = await import("../audit.ts");
+  });
 
   beforeEach(() => {
-    vi.resetModules();
     globalThis.__omnirouteMcpAuditDb = undefined;
     dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "omniroute-mcp-audit-"));
     dbFile = path.join(dataDir, "storage.sqlite");
@@ -47,6 +51,8 @@ describe("MCP audit shutdown", () => {
   afterEach(() => {
     delete process.env.DATA_DIR;
     globalThis.__omnirouteMcpAuditDb = undefined;
+    audit.__setBetterSqliteLoaderForTests(null);
+    audit.__setAuditCallerIdResolverForTests(null);
     vi.doUnmock("../../../src/lib/db/adapters/runtimeRequire.ts");
     vi.restoreAllMocks();
   });
@@ -59,7 +65,6 @@ describe("MCP audit shutdown", () => {
       open: true,
     };
 
-    const audit = await import("../audit.ts");
     // Inject through the connection cache — close behavior does not require a log write.
     globalThis.__omnirouteMcpAuditDb = mockDb as unknown as typeof globalThis.__omnirouteMcpAuditDb;
 
@@ -80,7 +85,6 @@ describe("MCP audit shutdown", () => {
       open: true,
     };
 
-    const audit = await import("../audit.ts");
     globalThis.__omnirouteMcpAuditDb = mockDb as unknown as typeof globalThis.__omnirouteMcpAuditDb;
 
     expect(audit.closeAuditDb()).toBe(true);
@@ -108,9 +112,7 @@ describe("MCP audit shutdown", () => {
       close() {}
     }
 
-    const audit = await import("../audit.ts");
-    globalThis.__omnirouteMcpAuditDb =
-      new FakeDatabase() as unknown as typeof globalThis.__omnirouteMcpAuditDb;
+    audit.__setBetterSqliteLoaderForTests(() => FakeDatabase);
 
     try {
       await expect(audit.getAuditStats()).resolves.toEqual({
@@ -151,7 +153,6 @@ describe("MCP audit shutdown", () => {
     });
     vi.doMock("node:sqlite", () => ({ DatabaseSync }));
 
-    const audit = await import("../audit.ts");
     audit.__setBetterSqliteLoaderForTests(() => {
       throw bindingErr;
     });
@@ -189,7 +190,6 @@ describe("MCP audit shutdown", () => {
     });
     vi.doMock("node:sqlite", () => ({ DatabaseSync }));
 
-    const audit = await import("../audit.ts");
     // Webpack/standalone stub: require("better-sqlite3") returns a non-callable
     // object, so the loader rejects it with "better-sqlite3 export is not a function"
     // (the minified runtime form is "a is not a function"; both classify the same).
@@ -217,7 +217,6 @@ describe("MCP audit shutdown", () => {
       close: vi.fn(),
       open: true,
     };
-    const audit = await import("../audit.ts");
     audit.__setBetterSqliteLoaderForTests(
       () =>
         function Database() {
@@ -242,7 +241,6 @@ describe("MCP audit shutdown", () => {
 
   it("caches a failed audit connection so dashboard polls do not reconnect", async () => {
     const connectErr = new Error("permission denied");
-    const audit = await import("../audit.ts");
     audit.__setBetterSqliteLoaderForTests(() => {
       throw connectErr;
     });
