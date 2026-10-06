@@ -37,6 +37,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push
+        id: build
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -54,3 +55,39 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
           cache-from: type=gha,scope=stable-ghcr-amd64
           cache-to: type=gha,scope=stable-ghcr-amd64,mode=max,ignore-error=true
+
+      - name: Inspect published image
+        run: |
+          set -euo pipefail
+          docker buildx imagetools inspect "${IMAGE_NAME}:stable"
+
+      - name: Publish image details
+        env:
+          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          {
+            echo "## Docker image"
+            echo
+            echo "| Detail | Value |"
+            echo "| --- | --- |"
+            echo "| Registry | `ghcr.io` |"
+            echo "| Image | `${IMAGE_NAME}` |"
+            echo "| Stable tag | `${IMAGE_NAME}:stable` |"
+            echo "| Commit tag | `${IMAGE_NAME}:sha-${GITHUB_SHA}` |"
+            echo "| Digest | `${IMAGE_DIGEST}` |"
+            echo "| Platform | `linux/amd64` |"
+            echo "| Source commit | `${GITHUB_SHA}` |"
+            echo
+            echo "### Pull"
+            echo
+            echo '~~~bash'
+            echo "docker pull ${IMAGE_NAME}:stable"
+            echo "docker pull ${IMAGE_NAME}:sha-${GITHUB_SHA}"
+            echo '~~~'
+            echo
+            echo "### Inspect"
+            echo
+            echo '~~~text'
+            docker buildx imagetools inspect "${IMAGE_NAME}:stable"
+            echo '~~~'
+          } >> "${GITHUB_STEP_SUMMARY}"
