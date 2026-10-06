@@ -36,11 +36,18 @@ beforeEach(() => {
   ).IS_REACT_ACT_ENVIRONMENT = true;
 });
 
-afterEach(() => {
+afterEach(async () => {
   while (roots.length > 0) {
     const root = roots.pop();
-    if (root) act(() => root.unmount());
+    if (root) {
+      await act(async () => {
+        root.unmount();
+      });
+    }
   }
+  // ReactDOM schedules some cleanup through the scheduler after unmount.
+  // Keep jsdom alive until that queued work has drained.
+  await new Promise<void>((resolve) => setImmediate(resolve));
   while (containers.length > 0) {
     containers.pop()?.remove();
   }
