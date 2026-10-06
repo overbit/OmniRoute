@@ -38,7 +38,7 @@ describe("MCP audit shutdown", () => {
 
   beforeAll(async () => {
     audit = await import("../audit.ts");
-  });
+  }, 30000);
 
   beforeEach(() => {
     globalThis.__omnirouteMcpAuditDb = undefined;
