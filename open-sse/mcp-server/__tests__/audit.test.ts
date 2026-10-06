@@ -60,12 +60,8 @@ describe("MCP audit shutdown", () => {
     };
 
     const audit = await import("../audit.ts");
-    audit.__setAuditCallerIdResolverForTests(async () => undefined);
-    // Inject through the connection cache — the seam the module itself uses.
+    // Inject through the connection cache — close behavior does not require a log write.
     globalThis.__omnirouteMcpAuditDb = mockDb as unknown as typeof globalThis.__omnirouteMcpAuditDb;
-
-    await audit.logToolCall("omniroute_get_health", { ok: true }, { ok: true }, 12, true);
-    expect(mockDb.prepare).toHaveBeenCalledTimes(1);
 
     expect(audit.closeAuditDb()).toBe(true);
     expect(mockDb.pragma).toHaveBeenCalledWith("wal_checkpoint(TRUNCATE)");
@@ -85,10 +81,8 @@ describe("MCP audit shutdown", () => {
     };
 
     const audit = await import("../audit.ts");
-    audit.__setAuditCallerIdResolverForTests(async () => undefined);
     globalThis.__omnirouteMcpAuditDb = mockDb as unknown as typeof globalThis.__omnirouteMcpAuditDb;
 
-    await audit.logToolCall("omniroute_get_health", {}, {}, 5, true);
     expect(audit.closeAuditDb()).toBe(true);
     expect(mockDb.close).toHaveBeenCalledTimes(1);
   });
@@ -115,7 +109,8 @@ describe("MCP audit shutdown", () => {
     }
 
     const audit = await import("../audit.ts");
-    audit.__setBetterSqliteLoaderForTests(() => FakeDatabase);
+    globalThis.__omnirouteMcpAuditDb =
+      new FakeDatabase() as unknown as typeof globalThis.__omnirouteMcpAuditDb;
 
     try {
       await expect(audit.getAuditStats()).resolves.toEqual({
@@ -126,7 +121,6 @@ describe("MCP audit shutdown", () => {
       });
     } finally {
       audit.closeAuditDb();
-      audit.__setBetterSqliteLoaderForTests(null);
     }
   });
 
