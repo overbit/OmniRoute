@@ -227,6 +227,14 @@ export default function CompressionPanel() {
   const saveGenRef = useRef(0);
   const lastConfirmedRef = useRef(config);
   const lastAckedGenRef = useRef(0);
+  const statusClearTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(
+    () => () => {
+      if (statusClearTimeoutRef.current) clearTimeout(statusClearTimeoutRef.current);
+    },
+    []
+  );
 
   useEffect(() => {
     fetch("/api/settings/compression")
@@ -288,6 +296,10 @@ export default function CompressionPanel() {
     configRef.current = next;
     setConfig(next);
     setSaving(true);
+    if (statusClearTimeoutRef.current) {
+      clearTimeout(statusClearTimeoutRef.current);
+      statusClearTimeoutRef.current = null;
+    }
     setStatus("");
     try {
       const res = await fetch("/api/settings/compression", {
@@ -306,7 +318,8 @@ export default function CompressionPanel() {
         if (res.ok) {
           setStatus("saved");
           const savedGen = gen;
-          setTimeout(() => {
+          statusClearTimeoutRef.current = setTimeout(() => {
+            statusClearTimeoutRef.current = null;
             if (savedGen === saveGenRef.current) setStatus("");
           }, 2000);
         } else {
