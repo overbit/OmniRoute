@@ -35,13 +35,13 @@ const { CompressionCockpit } =
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
-const containers: HTMLElement[] = [];
+const mounted: Array<{ container: HTMLElement; root: ReturnType<typeof createRoot> }> = [];
 
 function mount(ui: React.ReactElement): HTMLElement {
   const container = document.createElement("div");
   document.body.appendChild(container);
-  containers.push(container);
   const root = createRoot(container);
+  mounted.push({ container, root });
   act(() => {
     root.render(
       <NextIntlClientProvider
@@ -68,9 +68,13 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  while (containers.length > 0) {
-    containers.pop()?.remove();
-  }
+  act(() => {
+    while (mounted.length > 0) {
+      const entry = mounted.pop();
+      entry?.root.unmount();
+      entry?.container.remove();
+    }
+  });
   document.body.innerHTML = "";
 });
 
