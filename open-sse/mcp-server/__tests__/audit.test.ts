@@ -60,6 +60,7 @@ describe("MCP audit shutdown", () => {
     };
 
     const audit = await import("../audit.ts");
+    audit.__setAuditCallerIdResolverForTests(async () => undefined);
     // Inject through the connection cache — the seam the module itself uses.
     globalThis.__omnirouteMcpAuditDb = mockDb as unknown as typeof globalThis.__omnirouteMcpAuditDb;
 
@@ -84,6 +85,7 @@ describe("MCP audit shutdown", () => {
     };
 
     const audit = await import("../audit.ts");
+    audit.__setAuditCallerIdResolverForTests(async () => undefined);
     globalThis.__omnirouteMcpAuditDb = mockDb as unknown as typeof globalThis.__omnirouteMcpAuditDb;
 
     await audit.logToolCall("omniroute_get_health", {}, {}, 5, true);
@@ -112,18 +114,20 @@ describe("MCP audit shutdown", () => {
       close() {}
     }
 
-    vi.doMock("../../../src/lib/db/adapters/runtimeRequire.ts", () => ({
-      runtimeRequire: () => FakeDatabase,
-    }));
-
     const audit = await import("../audit.ts");
+    audit.__setBetterSqliteLoaderForTests(() => FakeDatabase);
 
-    await expect(audit.getAuditStats()).resolves.toEqual({
-      totalCalls: 7,
-      successRate: 0.75,
-      avgDurationMs: 12,
-      topTools: [{ tool: "omniroute_get_health", count: 7 }],
-    });
+    try {
+      await expect(audit.getAuditStats()).resolves.toEqual({
+        totalCalls: 7,
+        successRate: 0.75,
+        avgDurationMs: 12,
+        topTools: [{ tool: "omniroute_get_health", count: 7 }],
+      });
+    } finally {
+      audit.closeAuditDb();
+      audit.__setBetterSqliteLoaderForTests(null);
+    }
   });
 
   it("falls back to node:sqlite when better-sqlite3 binding is missing", async () => {
