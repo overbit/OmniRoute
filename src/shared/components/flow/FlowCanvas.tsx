@@ -73,8 +73,10 @@ export function FlowCanvas({
   // a new ReactFlow instance mounts (e.g. via fitKey change).
   const generationRef = useRef(0);
   const initRefitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mountedRef = useRef(true);
 
   const onInit = useCallback((instance: ReactFlowInstance) => {
+    if (!mountedRef.current) return;
     const generation = ++generationRef.current;
     rfInstance.current = instance;
     if (initRefitTimerRef.current !== null) {
@@ -85,7 +87,7 @@ export function FlowCanvas({
     // timer fires — see Bug #4 in the audit report.
     initRefitTimerRef.current = setTimeout(() => {
       initRefitTimerRef.current = null;
-      if (generationRef.current === generation) {
+      if (mountedRef.current && generationRef.current === generation) {
         instance.fitView(FIT_VIEW_OPTIONS);
       }
     }, REFIT_DELAY_MS);
@@ -106,7 +108,7 @@ export function FlowCanvas({
     // remount is silently dropped (no fitView on stale instance).
     const generation = generationRef.current;
     const id = setTimeout(() => {
-      if (generationRef.current === generation) {
+      if (mountedRef.current && generationRef.current === generation) {
         rfInstance.current?.fitView(FIT_VIEW_OPTIONS);
       }
     }, REFIT_DELAY_MS);
@@ -117,7 +119,9 @@ export function FlowCanvas({
   // tick fired just before the React tree unmounted) cannot reach into a
   // disposed ReactFlow instance.
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
+      mountedRef.current = false;
       if (initRefitTimerRef.current !== null) {
         clearTimeout(initRefitTimerRef.current);
         initRefitTimerRef.current = null;
