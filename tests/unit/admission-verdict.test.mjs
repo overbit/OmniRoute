@@ -251,7 +251,10 @@ for (const profile of ["ci", "quality"]) {
     );
     assert.equal(verdict.name, policy.profiles[profile].checkName);
     assert.equal(verdict.if, "${{ always() }}");
-    assert.deepEqual(workflow.on.pull_request.branches, ["main", "release/**"]);
+    assert.deepEqual(
+      workflow.on.pull_request.branches,
+      profile === "ci" ? ["main", "release/**", "stable"] : ["main", "release/**"]
+    );
     assert.deepEqual(workflow.on.push.branches, ["main", "release/**"]);
     assert.ok(workflow.on.merge_group.types.includes("checks_requested"));
     for (const job of Object.values(workflow.jobs)) {
