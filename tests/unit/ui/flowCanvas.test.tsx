@@ -2,7 +2,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import React, { act } from "react";
-import { createRoot } from "react-dom/client";
+import { createRoot, type Root } from "react-dom/client";
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { FlowCanvas } from "@/shared/components/flow/FlowCanvas";
 
@@ -16,12 +16,14 @@ beforeAll(() => {
 });
 
 const containers: HTMLElement[] = [];
+const roots: Root[] = [];
 
 function mount(ui: React.ReactElement): HTMLElement {
   const container = document.createElement("div");
   document.body.appendChild(container);
   containers.push(container);
   const root = createRoot(container);
+  roots.push(root);
   act(() => {
     root.render(ui);
   });
@@ -35,6 +37,10 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  while (roots.length > 0) {
+    const root = roots.pop();
+    if (root) act(() => root.unmount());
+  }
   while (containers.length > 0) {
     containers.pop()?.remove();
   }
