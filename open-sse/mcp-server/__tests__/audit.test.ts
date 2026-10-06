@@ -60,7 +60,6 @@ describe("MCP audit shutdown", () => {
     };
 
     const audit = await import("../audit.ts");
-    audit.__setAuditCallerIdResolverForTests(async () => undefined);
     // Inject through the connection cache — the seam the module itself uses.
     globalThis.__omnirouteMcpAuditDb = mockDb as unknown as typeof globalThis.__omnirouteMcpAuditDb;
 
@@ -85,7 +84,6 @@ describe("MCP audit shutdown", () => {
     };
 
     const audit = await import("../audit.ts");
-    audit.__setAuditCallerIdResolverForTests(async () => undefined);
     globalThis.__omnirouteMcpAuditDb = mockDb as unknown as typeof globalThis.__omnirouteMcpAuditDb;
 
     await audit.logToolCall("omniroute_get_health", {}, {}, 5, true);
@@ -114,8 +112,11 @@ describe("MCP audit shutdown", () => {
       close() {}
     }
 
+    vi.doMock("../../../src/lib/db/adapters/runtimeRequire.ts", () => ({
+      runtimeRequire: () => FakeDatabase,
+    }));
+
     const audit = await import("../audit.ts");
-    audit.__setBetterSqliteLoaderForTests(() => FakeDatabase);
 
     await expect(audit.getAuditStats()).resolves.toEqual({
       totalCalls: 7,

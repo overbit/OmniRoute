@@ -76,10 +76,10 @@ class OpensThenSilentWebSocket {
   url: string;
   constructor(url: string) {
     this.url = url;
-    setTimeout(() => {
+    queueMicrotask(() => {
       this.readyState = WebSocket.OPEN;
       this.onopen?.();
-    }, 0);
+    });
   }
   send(_data: Uint8Array | string) {}
   close() {}
