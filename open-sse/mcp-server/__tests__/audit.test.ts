@@ -1,7 +1,8 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import * as audit from "../audit.ts";
 
 type MockAuditDb = {
   prepare: ReturnType<typeof vi.fn>;
@@ -34,11 +35,6 @@ it("uses the bundle-safe runtime loader for better-sqlite3", () => {
 describe("MCP audit shutdown", () => {
   let dataDir: string;
   let dbFile: string;
-  let audit: typeof import("../audit.ts");
-
-  beforeAll(async () => {
-    audit = await import("../audit.ts");
-  }, 30000);
 
   beforeEach(() => {
     globalThis.__omnirouteMcpAuditDb = undefined;
