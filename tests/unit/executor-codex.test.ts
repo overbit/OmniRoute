@@ -1555,8 +1555,10 @@ test("CodexExecutor.refreshCredentials returns null for unrecoverable errors to 
     );
 
   try {
-    const result = await executor.refreshCredentials({ refreshToken: "dead-token" }, null);
+    const credentials = { refreshToken: "dead-token" };
+    const result = await executor.refreshCredentials(credentials, null);
     assert.equal(result, null, "should return null to leave original credentials untouched");
+    assert.deepEqual(credentials, { refreshToken: "dead-token" }, "should not mutate original credentials");
   } finally {
     globalThis.fetch = originalFetch;
   }
