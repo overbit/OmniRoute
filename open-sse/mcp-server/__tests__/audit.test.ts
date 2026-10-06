@@ -69,6 +69,7 @@ describe("MCP audit shutdown", () => {
     globalThis.__omnirouteMcpAuditDb = mockDb as unknown as typeof globalThis.__omnirouteMcpAuditDb;
 
     expect(audit.closeAuditDb()).toBe(true);
+    expect(globalThis.__omnirouteMcpAuditDb).toBeUndefined();
     expect(mockDb.pragma).toHaveBeenCalledWith("wal_checkpoint(TRUNCATE)");
     expect(mockDb.close).toHaveBeenCalledTimes(1);
     expect(audit.closeAuditDb()).toBe(false);
