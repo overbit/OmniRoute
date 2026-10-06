@@ -744,7 +744,7 @@ jobs:
           # Use the documented webpack fallback for PR validation; release/push builds
           # keep Turbopack on the high-memory runner.
           OMNIROUTE_USE_TURBOPACK: ${{ github.event_name == 'pull_request' && '0' || '1' }}
-          OMNIROUTE_BUILD_MEMORY_MB: ${{ github.event_name == 'pull_request' && '6656' || '8192' }}
+          OMNIROUTE_BUILD_MEMORY_MB: ${{ github.event_name == 'pull_request' && '7168' || '8192' }}
       - name: Archive Next.js build for downstream jobs
         # Use tar so the archive preserves paths relative to CWD (.build/next/...).
         # upload-artifact path-stripping is ambiguous when exclude patterns are used;
