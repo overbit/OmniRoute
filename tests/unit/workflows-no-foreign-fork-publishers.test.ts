@@ -37,6 +37,13 @@ const workflowDir = path.join(repoRoot, ".github/workflows");
 /** The only owner whose namespaces this repository may publish to or gate on. */
 const OWNER = "diegosouzapw";
 
+/**
+ * Fork-local publisher intentionally added for the overbit stable branch.
+ * Keep the exception scoped to one workflow + one owner so other foreign
+ * registry namespaces are still rejected.
+ */
+const REGISTRY_OWNER_EXCEPTIONS = new Map([["stable-ghcr.yml", "overbit"]]);
+
 function workflowFiles(): string[] {
   return fs
     .readdirSync(workflowDir)
@@ -53,8 +60,10 @@ test("no workflow publishes to another owner's container registry", () => {
     // right after the registry host.
     for (const m of text.matchAll(/\b(?:ghcr\.io|(?:index\.)?docker\.io)\/([A-Za-z0-9_.-]+)/g)) {
       const owner = m[1];
-      if (owner.toLowerCase() !== OWNER) {
-        offenders.push(`${path.basename(file)} → ${m[0]}`);
+      const filename = path.basename(file);
+      const allowedException = REGISTRY_OWNER_EXCEPTIONS.get(filename);
+      if (owner.toLowerCase() !== OWNER && owner.toLowerCase() !== allowedException) {
+        offenders.push(`${filename} → ${m[0]}`);
       }
     }
   }
