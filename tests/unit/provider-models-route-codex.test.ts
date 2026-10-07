@@ -4,7 +4,12 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { getCodexClientVersion } from "../../open-sse/config/codexClient.ts";
+import {
+  DEFAULT_CODEX_CLIENT_VERSION,
+  clearCodexClientVersionCache,
+  getCodexClientVersion,
+  seedCodexClientVersionCache,
+} from "../../open-sse/config/codexClient.ts";
 
 const TEST_DATA_DIR = fs.mkdtempSync(
   path.join(os.tmpdir(), "omniroute-provider-model-routes-codex-")
@@ -48,6 +53,8 @@ const originalFetch = globalThis.fetch;
 async function resetStorage() {
   globalThis.fetch = originalFetch;
   codexDiscovery.clearCodexGithubCatalogCacheForTests();
+  clearCodexClientVersionCache();
+  seedCodexClientVersionCache(DEFAULT_CODEX_CLIENT_VERSION);
   core.resetDbInstance();
   fs.rmSync(TEST_DATA_DIR, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   fs.mkdirSync(TEST_DATA_DIR, { recursive: true });
@@ -80,8 +87,62 @@ test.beforeEach(async () => {
 test.after(async () => {
   globalThis.fetch = originalFetch;
   codexDiscovery.clearCodexGithubCatalogCacheForTests();
+  clearCodexClientVersionCache();
   core.resetDbInstance();
   fs.rmSync(TEST_DATA_DIR, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+});
+
+test("Codex live discovery refreshes identity before fetching GPT-6.1 Sol", async () => {
+  clearCodexClientVersionCache();
+  const originalVersionOverride = process.env.CODEX_CLIENT_VERSION;
+  delete process.env.CODEX_CLIENT_VERSION;
+
+  const seenRequests: Array<{
+    url: string;
+    version: string | null;
+    userAgent: string | null;
+  }> = [];
+
+  try {
+    const models = await codexDiscovery.fetchCodexDiscoveryModels({
+      accessToken: "codex-access-token",
+      providerSpecificData: { chatgptAccountId: "account-123" },
+      fetchImpl: async (url, init) => {
+        const requestUrl = String(url);
+        const headers = new Headers(init.headers);
+        seenRequests.push({
+          url: requestUrl,
+          version: headers.get("version"),
+          userAgent: headers.get("user-agent"),
+        });
+        if (requestUrl === "https://registry.npmjs.org/@openai%2Fcodex/latest") {
+          return Response.json({ name: "@openai/codex", version: "0.160.1" });
+        }
+        return Response.json({
+          models: [
+            {
+              slug: "gpt-6.1-sol",
+              display_name: "GPT 6.1 Sol",
+              visibility: "list",
+              supported_in_api: true,
+            },
+          ],
+        });
+      },
+    });
+
+    assert.equal(seenRequests.length, 2);
+    assert.equal(seenRequests[0]?.url, "https://registry.npmjs.org/@openai%2Fcodex/latest");
+    assert.equal(seenRequests[1]?.url, "https://chatgpt.com/backend-api/codex/models?client_version=0.160.1");
+    assert.equal(seenRequests[1]?.version, "0.160.1");
+    assert.equal(seenRequests[1]?.userAgent, "codex-cli/0.160.1 (Windows 10.0.26200; x64)");
+    assert.equal(models?.[0]?.id, "gpt-6.1-sol");
+  } finally {
+    clearCodexClientVersionCache();
+    seedCodexClientVersionCache(DEFAULT_CODEX_CLIENT_VERSION);
+    if (originalVersionOverride === undefined) delete process.env.CODEX_CLIENT_VERSION;
+    else process.env.CODEX_CLIENT_VERSION = originalVersionOverride;
+  }
 });
 
 test("provider models route merges live Codex models with the local catalog then filters denylist", async () => {
