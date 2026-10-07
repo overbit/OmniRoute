@@ -1531,7 +1531,7 @@ export default function RoutingTab() {
             <h3 className="text-lg font-semibold">Search timeouts</h3>
             <p className="text-sm text-text-muted mt-1">
               How long a search waits before it is cut off. Leave a field empty to keep
-              the default: 15 seconds overall, and each provider's own limit.
+              the default: 15 seconds overall, and each provider&apos;s own limit.
             </p>
             <div className="mt-3 flex flex-wrap gap-3">
               <label className="flex flex-col gap-1 text-xs text-text-muted">
