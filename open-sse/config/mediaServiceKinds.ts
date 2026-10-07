@@ -22,7 +22,7 @@
 import { AUDIO_TRANSCRIPTION_PROVIDERS, AUDIO_SPEECH_PROVIDERS } from "./audioRegistry.ts";
 import { VIDEO_PROVIDERS } from "./videoRegistry.ts";
 import { MUSIC_PROVIDERS } from "./musicRegistry.ts";
-import { IMAGE_PROVIDERS } from "./imageRegistry.ts";
+import { BASE_IMAGE_PROVIDER_REGISTRY } from "./imageProviderServiceKinds.ts";
 import { EMBEDDING_PROVIDERS } from "./embeddingRegistry.ts";
 import { OCR_PROVIDERS } from "./ocrRegistry.ts";
 
@@ -32,7 +32,7 @@ export const MEDIA_KIND_REGISTRIES = {
   tts: AUDIO_SPEECH_PROVIDERS,
   video: VIDEO_PROVIDERS,
   music: MUSIC_PROVIDERS,
-  image: IMAGE_PROVIDERS,
+  image: BASE_IMAGE_PROVIDER_REGISTRY,
   embedding: EMBEDDING_PROVIDERS,
   ocr: OCR_PROVIDERS,
 } as const satisfies Record<string, Record<string, unknown>>;
