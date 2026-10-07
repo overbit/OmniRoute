@@ -18,10 +18,10 @@ type GenerationResult = {
   timestamp: number;
   audioUrl?: string;
 };
-const VIDEO_providerModels = toProviderModels(VIDEO_PROVIDERS);
-const MUSIC_providerModels = toProviderModels(MUSIC_PROVIDERS);
-const SPEECH_providerModels = toProviderModels(AUDIO_SPEECH_PROVIDERS);
-const TRANSCRIPTION_providerModels = toProviderModels(AUDIO_TRANSCRIPTION_PROVIDERS);
+const VIDEO_PROVIDER_MODELS = toProviderModels(VIDEO_PROVIDERS);
+const MUSIC_PROVIDER_MODELS = toProviderModels(MUSIC_PROVIDERS);
+const SPEECH_PROVIDER_MODELS = toProviderModels(AUDIO_SPEECH_PROVIDERS);
+const TRANSCRIPTION_PROVIDER_MODELS = toProviderModels(AUDIO_TRANSCRIPTION_PROVIDERS);
 
 const MODALITY_CONFIG: Record<
   Modality,
@@ -412,10 +412,10 @@ export default function MediaPageClient({
   const t = useTranslations("media");
   const providerModels: Record<Modality, ProviderModelGroup[]> = {
     image: imageProviderModels,
-    video: VIDEO_providerModels,
-    music: MUSIC_providerModels,
-    speech: SPEECH_providerModels,
-    transcription: TRANSCRIPTION_providerModels,
+    video: VIDEO_PROVIDER_MODELS,
+    music: MUSIC_PROVIDER_MODELS,
+    speech: SPEECH_PROVIDER_MODELS,
+    transcription: TRANSCRIPTION_PROVIDER_MODELS,
   };
   const initialImageProvider = providerModels.image[0];
   const initialImageModel = initialImageProvider?.models[0];
