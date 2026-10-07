@@ -12,6 +12,7 @@ import {
 } from "@/shared/constants/designerWebRetirement";
 
 import { getImageProvider, parseImageModel } from "../config/imageRegistry.ts";
+import "@/server/imageRegistryFeatureFlags";
 import { HTTP_STATUS } from "../config/constants.ts";
 import { applyAntigravityClientProfileHeaders } from "../services/antigravityClientProfile.ts";
 import { getAntigravityEnvelopeUserAgent } from "../services/antigravityIdentity.ts";
