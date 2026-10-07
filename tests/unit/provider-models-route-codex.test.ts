@@ -7,7 +7,6 @@ import path from "node:path";
 import {
   DEFAULT_CODEX_CLIENT_VERSION,
   clearCodexClientVersionCache,
-  getCodexClientVersion,
   seedCodexClientVersionCache,
 } from "../../open-sse/config/codexClient.ts";
 
@@ -139,7 +138,6 @@ test("Codex live discovery refreshes identity before fetching GPT-6.1 Sol", asyn
     assert.equal(models?.[0]?.id, "gpt-6.1-sol");
   } finally {
     clearCodexClientVersionCache();
-    seedCodexClientVersionCache(DEFAULT_CODEX_CLIENT_VERSION);
     if (originalVersionOverride === undefined) delete process.env.CODEX_CLIENT_VERSION;
     else process.env.CODEX_CLIENT_VERSION = originalVersionOverride;
   }
@@ -155,6 +153,7 @@ test("provider models route merges live Codex models with the local catalog then
   ]);
   const seenRequests: Array<Record<string, string | null>> = [];
 
+  clearCodexClientVersionCache();
   globalThis.fetch = async (url, init) => {
     const requestUrl = String(url);
     const headers = new Headers(init?.headers as HeadersInit | undefined);
@@ -165,6 +164,9 @@ test("provider models route merges live Codex models with the local catalog then
       originator: headers.get("originator"),
       userAgent: headers.get("user-agent"),
     });
+    if (requestUrl === "https://registry.npmjs.org/@openai%2Fcodex/latest") {
+      return Response.json({ name: "@openai/codex", version: "0.160.1" });
+    }
     if (requestUrl.includes("raw.githubusercontent.com/openai/codex")) {
       return Response.json({
         models: [
@@ -222,11 +224,18 @@ test("provider models route merges live Codex models with the local catalog then
   assert.equal(body.discoveredCandidateCount, undefined);
   assert.deepEqual(seenRequests, [
     {
-      url: `https://chatgpt.com/backend-api/codex/models?client_version=${getCodexClientVersion()}`,
+      url: "https://registry.npmjs.org/@openai%2Fcodex/latest",
+      authorization: null,
+      workspaceId: null,
+      originator: null,
+      userAgent: null,
+    },
+    {
+      url: "https://chatgpt.com/backend-api/codex/models?client_version=0.160.1",
       authorization: "Bearer codex-access-token",
       workspaceId: "account-123",
       originator: "codex_cli_rs",
-      userAgent: `codex-cli/${getCodexClientVersion()} (Windows 10.0.26200; x64)`,
+      userAgent: "codex-cli/0.160.1 (Windows 10.0.26200; x64)",
     },
     {
       url: "https://raw.githubusercontent.com/openai/codex/refs/heads/main/codex-rs/models-manager/models.json",
