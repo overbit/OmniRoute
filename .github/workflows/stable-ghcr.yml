@@ -1,0 +1,93 @@
+name: Publish stable image to GHCR
+
+on:
+  push:
+    branches:
+      - stable
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE_NAME: ghcr.io/overbit/omniroute
+
+jobs:
+  build-and-push:
+    name: Build and push stable image
+    # Reuse the repository's existing heavy-build runner convention when available.
+    # The Docker build is memory intensive; otherwise fall back to GitHub-hosted amd64.
+    runs-on: ${{ vars.USE_VPS_RUNNER == 'true' && fromJSON('["self-hosted","omni-build"]') || 'ubuntu-24.04' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          target: runner-base
+          platforms: linux/amd64
+          push: true
+          build-args: |
+            OMNIROUTE_USE_TURBOPACK=0
+            OMNIROUTE_BUILD_MEMORY_MB=12288
+          tags: |
+            ${{ env.IMAGE_NAME }}:stable
+            ${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=stable-ghcr-amd64
+          cache-to: type=gha,scope=stable-ghcr-amd64,mode=max,ignore-error=true
+
+      - name: Inspect published image
+        run: |
+          set -euo pipefail
+          docker buildx imagetools inspect "${IMAGE_NAME}:stable"
+
+      - name: Publish image details
+        env:
+          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          {
+            echo "## Docker image"
+            echo
+            echo "| Detail | Value |"
+            echo "| --- | --- |"
+            echo "| Registry | `ghcr.io` |"
+            echo "| Image | `${IMAGE_NAME}` |"
+            echo "| Stable tag | `${IMAGE_NAME}:stable` |"
+            echo "| Commit tag | `${IMAGE_NAME}:sha-${GITHUB_SHA}` |"
+            echo "| Digest | `${IMAGE_DIGEST}` |"
+            echo "| Platform | `linux/amd64` |"
+            echo "| Source commit | `${GITHUB_SHA}` |"
+            echo
+            echo "### Pull"
+            echo
+            echo '~~~bash'
+            echo "docker pull ${IMAGE_NAME}:stable"
+            echo "docker pull ${IMAGE_NAME}:sha-${GITHUB_SHA}"
+            echo '~~~'
+            echo
+            echo "### Inspect"
+            echo
+            echo '~~~text'
+            docker buildx imagetools inspect "${IMAGE_NAME}:stable"
+            echo '~~~'
+          } >> "${GITHUB_STEP_SUMMARY}"
