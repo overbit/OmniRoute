@@ -18,8 +18,8 @@ import {
 } from "./chatCore/failureUsage.ts";
 import { createTranslationFailureResult } from "./chatCore/translationFailure.ts";
 import {
+  estimateCalibratedFinalInputTokens,
   estimateFinalInputTokenBreakdown,
-  estimateFinalInputTokens,
 } from "./chatCore/contextEstimation.ts";
 import {
   extractSystemRoleMessages,
@@ -226,8 +226,8 @@ import {
 import type { EnforceDecision } from "@/lib/quota/types";
 import { isCompressionExcluded } from "../services/compression/exclusions.ts";
 import {
+  defaultComboForRequest,
   isBuiltinStackedPipeline,
-  isStackedCompressionCombo,
   type RuntimeCompressionCombo,
 } from "./chatCore/compressionComboPredicates.ts";
 import { emitOutputStyleTelemetry } from "./chatCore/outputStyleTelemetry.ts";
@@ -1542,14 +1542,19 @@ async function handleChatCoreInner({
         try {
           const { getDefaultCompressionCombo } =
             await import("../../src/lib/db/compressionCombos.ts");
-          const defaultCompressionCombo = getDefaultCompressionCombo();
-          if (
-            isStackedCompressionCombo(defaultCompressionCombo as RuntimeCompressionCombo | null) &&
-            applyCompressionComboConfig(defaultCompressionCombo as RuntimeCompressionCombo | null)
-          ) {
+          const defaultCompressionCombo = defaultComboForRequest(
+            getDefaultCompressionCombo() as RuntimeCompressionCombo | null,
+            { config, header: compressionHeader, combos: namedCombos }
+          );
+          if (applyCompressionComboConfig(defaultCompressionCombo)) {
             log?.debug?.(
               "COMPRESSION",
               `Default compression combo applied: ${defaultCompressionCombo?.id}`
+            );
+          } else if (compressionHeader) {
+            log?.debug?.(
+              "COMPRESSION",
+              `Default compression combo not applied (header: ${compressionHeader})`
             );
           }
         } catch (err) {
@@ -2077,7 +2082,8 @@ async function handleChatCoreInner({
   // filtering is advisory and may preserve an all-incompatible pool; this is the
   // hard boundary that prevents a too-large prompt (or a negative token budget)
   // from reaching an OpenAI-compatible upstream such as NVIDIA NIM.
-  let finalEstimatedInputTokens = estimateFinalInputTokens(body as Record<string, unknown>);
+  // #14931: scaled by the learned actual/estimated ratio (factor 1.0 cold).
+  let finalEstimatedInputTokens = estimateCalibratedFinalInputTokens(body, provider, effectiveModel);
   // Reuse the already-resolved `contextLimit` (may have been narrowed to the
   // per-target combo window above, resolveComboContextLimit) instead of a bare
   // getTokenLimit(provider, effectiveModel) re-fetch, which would silently
@@ -2107,7 +2113,7 @@ async function handleChatCoreInner({
             dropMissingMappedItems: true,
           })
         : lastResortResult.body;
-      finalEstimatedInputTokens = estimateFinalInputTokens(body as Record<string, unknown>);
+      finalEstimatedInputTokens = estimateCalibratedFinalInputTokens(body, provider, effectiveModel);
       const finalInputBreakdown = estimateFinalInputTokenBreakdown(
         body as Record<string, unknown>
       );
@@ -2121,6 +2127,7 @@ async function handleChatCoreInner({
     }
   }
 
+  const calibrationEstimatedInputTokens = finalEstimatedInputTokens; // #14931 pairing
   const modelOutputCap = toPositiveInteger(
     getExplicitModelOutputCap({ provider, model: effectiveModel })
   );
@@ -3199,7 +3206,13 @@ async function handleChatCoreInner({
         ),
       3,
       log,
-      provider
+      provider,
+      {
+        ...(casConnectionId ? { connectionId: casConnectionId } : {}),
+        scope: resilienceSettings.tokenRefreshBreaker.scope,
+        failureThreshold: resilienceSettings.tokenRefreshBreaker.failureThreshold,
+        cooldownMs: resilienceSettings.tokenRefreshBreaker.cooldownMs,
+      }
     )) as null | Record<string, unknown>;
 
     if (newCredentials?.accessToken || newCredentials?.copilotToken) {
@@ -3606,6 +3619,7 @@ async function handleChatCoreInner({
       provider,
       providerRequestCapture,
       reqLogger,
+      resilienceSettings,
       sessionAffinityKey,
       skillRequestId,
       sourceFormat,
@@ -3654,6 +3668,7 @@ async function handleChatCoreInner({
       buildCostCtx,
       buildErrorBody,
       calculateCost,
+      calibrationEstimatedInputTokens,
       claudePromptCacheLogMeta,
       clientRawRequest,
       clientRequestedResponsesStream,
@@ -3786,6 +3801,7 @@ async function handleChatCoreInner({
     attachCompressionUsageReceiptAfterAnalytics,
     body,
     bodyForCacheWrite,
+    calibrationEstimatedInputTokens,
     claudePromptCacheLogMeta,
     clientRawRequest,
     clientResponseFormat,
@@ -3800,6 +3816,7 @@ async function handleChatCoreInner({
     currentModel,
     customToolNames,
     echoModel,
+    effectiveModel,
     effectiveServiceTier,
     endpointPath,
     executeProviderRequest,
