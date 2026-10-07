@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
-import { IMAGE_PROVIDERS } from "@omniroute/open-sse/config/imageRegistry.ts";
 import { VIDEO_PROVIDERS } from "@omniroute/open-sse/config/videoRegistry.ts";
 import { MUSIC_PROVIDERS } from "@omniroute/open-sse/config/musicRegistry.ts";
 import {
@@ -19,11 +18,10 @@ type GenerationResult = {
   timestamp: number;
   audioUrl?: string;
 };
-const IMAGE_PROVIDER_MODELS = toProviderModels(IMAGE_PROVIDERS);
-const VIDEO_PROVIDER_MODELS = toProviderModels(VIDEO_PROVIDERS);
-const MUSIC_PROVIDER_MODELS = toProviderModels(MUSIC_PROVIDERS);
-const SPEECH_PROVIDER_MODELS = toProviderModels(AUDIO_SPEECH_PROVIDERS);
-const TRANSCRIPTION_PROVIDER_MODELS = toProviderModels(AUDIO_TRANSCRIPTION_PROVIDERS);
+const VIDEO_providerModels = toProviderModels(VIDEO_PROVIDERS);
+const MUSIC_providerModels = toProviderModels(MUSIC_PROVIDERS);
+const SPEECH_providerModels = toProviderModels(AUDIO_SPEECH_PROVIDERS);
+const TRANSCRIPTION_providerModels = toProviderModels(AUDIO_TRANSCRIPTION_PROVIDERS);
 
 const MODALITY_CONFIG: Record<
   Modality,
@@ -71,17 +69,6 @@ const MODALITY_CONFIG: Record<
     color: "from-indigo-500 to-blue-500",
   },
 };
-
-// Provider+model registry derived from runtime registries to avoid dashboard drift
-const PROVIDER_MODELS: Record<Modality, ProviderModelGroup[]> = {
-  image: IMAGE_PROVIDER_MODELS,
-  video: VIDEO_PROVIDER_MODELS,
-  music: MUSIC_PROVIDER_MODELS,
-  speech: SPEECH_PROVIDER_MODELS,
-  transcription: TRANSCRIPTION_PROVIDER_MODELS,
-};
-const INITIAL_IMAGE_PROVIDER = PROVIDER_MODELS.image[0];
-const INITIAL_IMAGE_MODEL = INITIAL_IMAGE_PROVIDER?.models[0];
 
 // Voice presets per TTS provider
 const VOICE_PRESETS: Record<string, { id: string; label: string }[]> = {
@@ -417,16 +404,29 @@ function ImageResults({ data }: { data: any }) {
   );
 }
 
-export default function MediaPageClient() {
+export default function MediaPageClient({
+  imageProviderModels,
+}: {
+  imageProviderModels: ProviderModelGroup[];
+}) {
   const t = useTranslations("media");
+  const providerModels: Record<Modality, ProviderModelGroup[]> = {
+    image: imageProviderModels,
+    video: VIDEO_providerModels,
+    music: MUSIC_providerModels,
+    speech: SPEECH_providerModels,
+    transcription: TRANSCRIPTION_providerModels,
+  };
+  const initialImageProvider = providerModels.image[0];
+  const initialImageModel = initialImageProvider?.models[0];
   const [activeTab, setActiveTab] = useState<Modality>("image");
   const [prompt, setPrompt] = useState("");
 
   // Selected provider and model per modality
   const [selectedProvider, setSelectedProvider] = useState<string>(
-    INITIAL_IMAGE_PROVIDER?.id ?? ""
+    initialImageProvider?.id ?? ""
   );
-  const [selectedModel, setSelectedModel] = useState<string>(INITIAL_IMAGE_MODEL?.id ?? "");
+  const [selectedModel, setSelectedModel] = useState<string>(initialImageModel?.id ?? "");
 
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<GenerationResult | null>(null);
@@ -490,7 +490,7 @@ export default function MediaPageClient() {
   }, []);
 
   // Filter out unconfigured local providers from the provider list
-  const currentProviders = (PROVIDER_MODELS[activeTab] ?? []).filter(
+  const currentProviders = (providerModels[activeTab] ?? []).filter(
     (p) => !LOCAL_PROVIDERS.includes(p.id) || configuredLocalProviders.has(p.id)
   );
   const currentModels = currentProviders.find((p) => p.id === selectedProvider)?.models ?? [];
@@ -505,7 +505,7 @@ export default function MediaPageClient() {
     setImageInputFile(null);
     setImageMaskFile(null);
     // Pick first provider and first model automatically
-    const providers = PROVIDER_MODELS[tab] ?? [];
+    const providers = providerModels[tab] ?? [];
     const firstProvider = providers[0];
     setSelectedProvider(firstProvider?.id ?? "");
     const firstModel = firstProvider?.models[0]?.id ?? "";
@@ -518,7 +518,7 @@ export default function MediaPageClient() {
 
   const handleProviderChange = (providerId: string) => {
     setSelectedProvider(providerId);
-    const models = PROVIDER_MODELS[activeTab]?.find((p) => p.id === providerId)?.models ?? [];
+    const models = providerModels[activeTab]?.find((p) => p.id === providerId)?.models ?? [];
     const firstModel = models[0]?.id ?? "";
     setSelectedModel(firstModel);
     if (activeTab === "speech") {
@@ -1035,7 +1035,7 @@ export default function MediaPageClient() {
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         {(Object.keys(MODALITY_CONFIG) as Modality[]).map((key) => {
           const cfg = MODALITY_CONFIG[key];
-          const providerCount = PROVIDER_MODELS[key]?.length ?? 0;
+          const providerCount = providerModels[key]?.length ?? 0;
           return (
             <div
               key={key}
