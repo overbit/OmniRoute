@@ -80,6 +80,7 @@ import type { ModelCapabilityEntry } from "@/lib/modelsDevSync";
 import { getModelSpec } from "@/shared/constants/modelSpecs";
 import { classifyModelSupportedEndpoints } from "@/shared/constants/modelSupportedEndpoints";
 import { getModelsCatalogPrefixMode } from "@/shared/utils/featureFlags";
+import "@/server/imageRegistryFeatureFlags";
 import {
   isProviderNodePrefixReserved,
   selectCompatibleNodeForPrefix,

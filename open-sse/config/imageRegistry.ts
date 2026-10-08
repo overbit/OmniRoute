@@ -5,7 +5,6 @@
  * Each provider has its own request format and endpoint.
  */
 
-import { isFeatureFlagEnabled } from "@/shared/utils/featureFlags.ts";
 import { hasUnsafeModelIdSyntax } from "../utils/modelIdSafety.ts";
 import { LMARENA_DIRECT_IMAGE_MODELS } from "./providers/registry/lmarena/directModels.ts";
 import { SEGMIND_IMAGE_PROVIDER } from "./providers/registry/segmind/imageModels.ts";
@@ -71,6 +70,20 @@ interface ImageCatalogModelEntry {
   mediaCapabilities?: Record<string, unknown>;
 }
 
+type ImageRegistryFeatureFlagResolver = (key: string) => boolean;
+
+let imageRegistryFeatureFlagResolver: ImageRegistryFeatureFlagResolver | null = null;
+
+/**
+ * Server entry points inject the live feature-flag resolver. The registry itself
+ * stays browser-safe because dashboard clients import its static provider data.
+ */
+export function setImageRegistryFeatureFlagResolver(
+  resolver: ImageRegistryFeatureFlagResolver | null
+): void {
+  imageRegistryFeatureFlagResolver = resolver;
+}
+
 // OAuth variants keep their provider identity for token refresh and account selection.
 const XAI_IMAGE_CONFIG = {
   baseUrl: "https://api.x.ai/v1/images/generations",
@@ -106,15 +119,18 @@ const XAI_SUBSCRIPTION_IMAGE_PROVIDERS: Record<string, ImageProviderConfig> = {
 
 export function isGrokSubscriptionImagesEnabled(): boolean {
   try {
-    return isFeatureFlagEnabled("GROK_SUBSCRIPTION_IMAGES_ENABLED");
+    if (imageRegistryFeatureFlagResolver) {
+      return imageRegistryFeatureFlagResolver("GROK_SUBSCRIPTION_IMAGES_ENABLED");
+    }
   } catch (error) {
     console.error(
-      "[imageRegistry] Failed to resolve GROK_SUBSCRIPTION_IMAGES_ENABLED, defaulting to disabled:",
+      "[imageRegistry] Failed to resolve GROK_SUBSCRIPTION_IMAGES_ENABLED, falling back to env:",
       error instanceof Error ? error.message : error
     );
-    const envValue = process.env.GROK_SUBSCRIPTION_IMAGES_ENABLED;
-    return envValue === "true" || envValue === "1" || envValue === "yes";
   }
+
+  const envValue = process.env.GROK_SUBSCRIPTION_IMAGES_ENABLED;
+  return envValue === "true" || envValue === "1" || envValue === "yes";
 }
 
 function visibleImageProviders(): Record<string, ImageProviderConfig> {

@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - stable
+  pull_request:
+    branches:
+      - stable
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 
 permissions:
@@ -18,7 +22,7 @@ jobs:
     name: Build and push stable image
     # Reuse the repository's existing heavy-build runner convention when available.
     # The Docker build is memory intensive; otherwise fall back to GitHub-hosted amd64.
-    runs-on: ${{ vars.USE_VPS_RUNNER == 'true' && fromJSON('["self-hosted","omni-build"]') || 'ubuntu-24.04' }}
+    runs-on: ${{ (vars.USE_VPS_RUNNER == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)) && fromJSON('["self-hosted","omni-build"]') || 'ubuntu-24.04' }}
 
     steps:
       - name: Checkout
@@ -43,7 +47,7 @@ jobs:
           context: .
           target: runner-base
           platforms: linux/amd64
-          push: true
+          push: ${{ github.event_name != 'pull_request' }}
           build-args: |
             OMNIROUTE_USE_TURBOPACK=0
             OMNIROUTE_BUILD_MEMORY_MB=12288
@@ -57,11 +61,13 @@ jobs:
           cache-to: type=gha,scope=stable-ghcr-amd64,mode=max,ignore-error=true
 
       - name: Inspect published image
+        if: github.event_name != 'pull_request'
         run: |
           set -euo pipefail
           docker buildx imagetools inspect "${IMAGE_NAME}:stable"
 
       - name: Publish image details
+        if: github.event_name != 'pull_request'
         env:
           IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
         run: |
